@@ -34,8 +34,8 @@ cat("Train error\nMSE: ", train_mse, "\nRMSE: ", train_rmse, "\n\nTest error\nMS
 
 # Comment on the quality of fit and prediction and therefore on the quality of model.
 
-# Our loss-function (MSE) is showing quite a difference between the prediction of train and test set values.
-# The MSE for the train set is ~0.56 while the MSE for the test set returns a value of ~1.01. 
+# Our loss-function (MSE) is showing big differences between the prediction of train and test set values.
+# The MSE for the train set is very low while the MSE for the test set returns a very high value. 
 # Therefore, our model seems to be overfitting on the train data.
 
 # 2)
@@ -66,21 +66,34 @@ plot(model_lasso, xvar="lambda", label=T)
 
 
 # What value of the penalty factor can be chosen if we want to select a model with only three features?
+
 # To solve this question we check the plot again and look for the lambda value that only has 3 nonzero coefficients. 
 # We see that the coefficient with the label '40' goes to 0 at around Log Lambda = -2.8. We only have 3 non-zero coefficients left at that point.
 
 # 4) 
 # Present a plot of how degrees of freedom depend on the penalty parameter. Is the observed trend expected?
-lambda = model_lasso$lambda
-df = model_lasso$df
-ggplot(data=NULL, aes(lambda, df)) + geom_point(color="red")
+# Compute hat-matrix and degrees of freedom
+
+library(psych)
+calc_dof <- function(lambda) {
+  ld <- lambda * diag(ncol(covariates))
+  print (ld)
+  H <- covariates %*% solve(t(covariates) %*% covariates + ld) %*% t(covariates)
+  dof <- tr(H)
+}
+
+dof = c()
+lambdas = model_lasso$lambda
+for (i in 1:length(lambdas)) {
+  dof[i] = calc_dof(lambdas[i])
+}
+dof
+
+ggplot(data=NULL, aes(lambdas, dof)) + geom_point(color="red")
 # The trend is as expected. 
 # If lambda is large, the parameters are heavily constrained and the degrees of freedom will effectively be lower, tending to 0
 # as lambda -> Inf.
-# For lambda -> 0, we have *p* parameters. As in OLS all parameters stay the same, no penelazation to be found. Therefore degrees of freedom =
-# There is a 1:1 mapping between lambda and the degrees of freedom, so in practice one may simply pick the effective degrees of freedom 
-# that one would like associated with the fit, and solve for lambda
-# TODO o.g. in eigene worte umwandeln!
+# For lambda -> 0, we have *p* parameters. As in OLS all parameters stay the same, no penelazation to be found.
 
 # 5)
 # Repeat step 3 but fit Ridge instead of the LASSO regression and compare the plots from steps 3 and 5. Conclusions?
@@ -98,7 +111,8 @@ plot(model_ridge, xvar="lambda", label=T)
 
 # 6)
 
-# Use cross-validation to compute the optimal LASSO model. 
+# Use cross-validation to compute the optimal LASSO model.
+set.seed(12345)
 cv_lasso = cv.glmnet(as.matrix(covariates), response, alpha=1, family="gaussian", lambda=seq(0,1,0.001))
 # Present a plot showing the dependence of the CV score on log𝜆and comment how the CV score changes with log𝜆. 
 plot(cv_lasso)
@@ -116,29 +130,75 @@ cat("The optimal 𝜆: ", optimal_lambda, "\nNumber of variables choosen: ", len
 # We are comparing the cv-score for our optimal lambda given by lambda.min with the cv-score for log(lambda) = -2.
 
 # transform lambda
-lambda_to_compare = exp(-2)
+lambda_to_compare = round(exp(-2),3)
+cvm = cv_lasso$cvm
+lambda = cv_lasso$lambda
+plot(cv_lasso$lambda, cv_lasso$cvm)
+
+lambda_cvm = cbind(lambda, cvm)
+ind_lambda_to_compare = which(lambda_cvm[,1]==lambda_to_compare, arr.ind = TRUE)
+cvm_lambda_to_compare = lambda_cvm[ind_lambda_to_compare,]
+print(cvm_lambda_to_compare)
 
 # We check the cvm for lambda_to_compare and get a value of 0.81816120. Compared to our optimal lambda=0 with cv-score
-# of 0.06060929 we calculate 
+# of 0.06060929
 
-cv_lasso$cvm
-cv_lasso$lambda
-print(cv_lasso)
 
 # TODO Finally, create a scatter plot of the original test versus predicted test values for the model corresponding to optimal lambda 
 # and comment whether the model predictions are good.
 test_x = as.matrix(model.matrix(fmla, test)[,-1])
-test_y = scale(test$Fat)
+test_y = test$Fat
 
-lasso_model <- glmnet(as.matrix(covariates), response, alpha = 1, lambda=optimal_lambda)
-test_predictions_lasso <- predict(lasso_model, s=optimal_lambda, newx=test_x, type="response")
+lasso_model = glmnet(as.matrix(covariates), response, alpha = 1, lambda=optimal_lambda)
+test_predictions_lasso = predict(lasso_model, newx=test_x, type="response")
 
 test_mse_lasso = mean((test_y-test_predictions_lasso)^2)
+
+# Coefficient of determination
+sum((test_predictions_lasso-mean(test_y))^2)/sum((test_y-mean(test_y))^2)
+sum((test_predictions_lasso-test_y)^2)
+
+true_pred_df = cbind(test[c(1,102)], test_predictions_lasso)
+colnames(true_pred_df)[2] = "True"
+colnames(true_pred_df)[3] = "Prediction"
+
+library(tidyr)
+
+true_pred_df %>% 
+  gather(key, value, -Sample) %>% 
+  ggplot(aes(Sample, value)) + geom_point(aes(color = key)) +
+  ylab("True ~ Prediction") +
+  xlab("Sample ID") + 
+  scale_colour_manual(name="Legend", values=c("red", "blue"))
+
+
 
 # 7)
 # Use the feature values from test data (the portion of test data with Channel columns) and the optimal LASSO model from step 6 to generate new target values. 
 # (Hint: use rnorm() and compute 𝜎 as standard deviation of residuals from train data predictions). 
 # Make a scatter plot of original Fat in test data versus newly generated ones. Comment on the quality of the data generation.
+features_values = test[2:101]
+train_x = as.matrix(model.matrix(fmla, train)[,-1])
+train_predictions_lasso = predict(lasso_model, newx=train_x, type="response")
+
+sigma = sd(train_predictions_lasso)
+sigma
+
+madeup_data <- 1:30*(rnorm(30)+3)
+plot(madeup_data)
+model <- lm(madeup_data ~ c(1:30))
+abline(model)
 
 
 
+resid <- round(resid(lasso_model),3)
+pred_values <- predict(lasso_model)
+
+sim_err <- runif(length(pred_values), min = min(resid), max = max(resid))
+sim_values <- c()
+
+for(i in 1:length(madeup_data)) {
+    sim_values[i] <- (pred_values[i] + sim_err[i])
+}
+
+points(madeup_data, sim_values, pch=23, col="green")

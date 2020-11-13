@@ -1,0 +1,203 @@
+---
+title: "Computer lab 1 block 1 - Assignment 3"
+author: "Tim Yuki Washio"
+date: "11/10/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, a3=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(glmnet)
+library(psych)
+library(tidyr)
+```
+
+# Assignment 3 - Linear regression and LASSO
+
+```{r data preperation, a3=TRUE}
+# Load data 
+data = read.csv("data/tecator.csv")
+
+# Split data into train and test set
+n = dim(data)[1]
+set.seed(12345)
+id = sample(1:n, floor(n*0.5))
+train = data[id,]
+test = data[-id,]
+```
+
+## 1.
+Assume that Fat can be modeled as a linear regression in which absorbance characteristics (Channels) are used as features. Report the underlying probabilistic model, fit the linear regression to the training data and estimate the training and test errors. Comment on the quality of fit and prediction and therefore on the quality of model.
+
+*Probabilistic model*:
+$$\hat{y} = \beta_0 +\sum_{i = 1}^{100} \beta_i*x_i + \epsilon \sim {\sf N}(\mu, \sigma^2)$$
+
+```{r linreg, echo=FALSE, a3=TRUE}
+# Fitting the linear regression model
+predictors <- paste("Channel", 1:100, sep="")
+fmla <- as.formula(paste("Fat ~ ", paste(predictors, collapse= "+")))
+
+fit = lm(fmla, data=train)
+summary(fit)
+
+# Estimating training and test errors
+train_predictions_lm = predict(fit, train)
+train_mse = mean((train$Fat-train_predictions_lm)^2)
+train_rmse = sqrt(mean((train$Fat-train_predictions_lm)^2))
+
+test_predictions_lm = predict(fit, test)
+test_mse = mean((test$Fat-test_predictions_lm)^2)
+test_rmse = sqrt(mean((test$Fat-test_predictions_lm)^2))
+
+cat("Train error\nMSE: ", train_mse, "\nRMSE: ", train_rmse, "\n\nTest error\nMSE: ", test_mse, "\nRMSE: ", test_rmse)
+```
+
+Our loss-function (MSE) is showing big differences between the prediction of train and test set values. The MSE for the train set is very low while the MSE for the test set returns a very high value. Therefore, our model is overfitting on the training data.
+
+## 2.
+
+$$\underset{\beta}{\operatorname{argmin}}\left[\sum_{i = 1}^{n}\left(Y_i-\beta_0-\sum_{j = 1}^{p}\beta_jX_{ji}\right)^2+\lambda\sum_{j = 1}^{p}|\beta_j|\right]$$
+## 3.
+
+```{r, echo=FALSE, a3=TRUE}
+covariates = scale(train[,2:101])
+response = scale(train$Fat)
+
+# alpha=1 to choose 'Lasso'
+set.seed(12345)
+model_lasso = glmnet(as.matrix(covariates), response, alpha=1, family="gaussian")
+plot(model_lasso, xvar="lambda", label=T)
+```
+
+This plot shows the relationship between $log(\lambda)$ and value of coefficients in the *LASSO* model. We can see that a bigger $log(\lambda)$ evaluates to less non-zero coefficients. At $log(\lambda) = -8$ most of the coefficients are non-zero. Choosing $\lambda=0$ returns the same results as using OLS for the model coefficients since no penalty is given. For each coefficient we can also see the influence (positive or negative) on our prediction depending on different $log(\lambda)$ values.
+
+To find the $\lambda$ value where our model contains only 3 non-zero coefficients we check the plot again.
+We see that the coefficient with the label '40' goes to 0 at around $log(\lambda) = -2.8$. We calculate $\lambda = e^{-2.8} \approx 0.06$ and get the approximate $\lambda$ where we have 3 non-zero coefficients left.
+
+## 4.
+
+```{r, echo=FALSE, a3=TRUE}
+calc_dof <- function(lambda) {
+  ld <- lambda * diag(ncol(covariates))
+  H <- covariates %*% solve(t(covariates) %*% covariates + ld) %*% t(covariates)
+  dof <- tr(H)
+}
+
+dof = c()
+lambdas = model_lasso$lambda
+for (i in 1:length(lambdas)) {
+  dof[i] = calc_dof(lambdas[i])
+}
+
+ggplot(data=NULL, aes(lambdas, dof)) + geom_point(color="red")
+```
+
+The trend is as expected. If lambda is large, the parameters are heavily constrained and the degrees of freedom will effectively be lower, tending to 0 as $\lambda$ -> $\infty$. For $\lambda$ -> $0$, we have *p* parameters. As in OLS all coefficients stay the same, no penalization to be found.
+
+## 5.
+
+```{r, echo=FALSE, a3=TRUE}
+# alpha=0 to choose 'Ridge'
+set.seed(12345)
+model_ridge = glmnet(as.matrix(covariates), response, alpha=0, family="gaussian")
+plot(model_ridge, xvar="lambda", label=T)
+
+```
+
+Both Ridge and LASSO regression are shrinkage methods that try to reduce the complexity of a model by shrinking or eliminating (LASSO only) its coefficients. For the Ridge regression the number of coefficients stays the same regardless of how big $log(\lambda)$ gets. For LASSO regression the number of coefficients decreases with increasing value of $log(\lambda)$. Looking at the LASSO plot it is easier to determine which coefficients are the most significant compared to looking at the Ridge plot.
+
+## 6.
+
+```{r, echo=FALSE, a3=TRUE}
+set.seed(12345)
+cv_lasso = cv.glmnet(as.matrix(covariates), response, alpha=1, family="gaussian", lambda=seq(0,1,0.001))
+plot(cv_lasso)
+```
+
+We can see a correlation between increasing $log(\lambda)$ and increasing MSE. Up until $log(\lambda) \approx  -4$ we observe a flat rise of MSE. Afterwards the MSE grows very steeply until it reaches a plateau at $log(\lambda) \approx  -2.5$. Then we observe a slow rise again until we reach $log(\lambda) \approx  -1$. From this point onward the MSE stays at its maximum since there are no non-zero coefficients left.
+
+```{r, echo=FALSE, a3=TRUE}
+optimal_lambda = cv_lasso$lambda.min
+cat("The optimal lambda: ", optimal_lambda, "\nNumber of variables choosen: ", length(coef(cv_lasso, s="lambda.min")))
+```
+
+```{r, echo=FALSE, a3=TRUE}
+lambda_to_compare = round(exp(-2),3)
+cvm = cv_lasso$cvm
+lambda = cv_lasso$lambda
+plot(cv_lasso$lambda, cv_lasso$cvm)
+
+lambda_cvm = cbind(lambda, cvm)
+ind_lambda_to_compare = which(lambda_cvm[,1]==lambda_to_compare, arr.ind = TRUE)
+cvm_lambda_to_compare = lambda_cvm[ind_lambda_to_compare,]
+print(cvm_lambda_to_compare)
+```
+
+We check *cvm* for $log(\lambda)=-2$ and get a value of 0.7918415. $log(\lambda)=-2$ is significantly worse compared to our optimal $\lambda$ with cv-score of 0.06060929.
+
+```{r, echo=FALSE, a3=TRUE}
+test_x = scale(test[, 2:101])
+test_y = scale(test$Fat)
+
+model_lasso_optimal = glmnet(as.matrix(covariates), response, alpha = 1, lambda=optimal_lambda)
+test_predictions_lasso = predict(model_lasso_optimal, newx=test_x, type="response")
+
+determination_coefficient = sum((test_predictions_lasso-mean(test_y))^2)/sum((test_y-mean(test_y))^2)
+test_mse_lasso_optimal = mean((test_predictions_lasso-test_y)^2)
+
+cat("Coefficient of determination: ", determination_coefficient, "\nMSE: ", test_mse_lasso_optimal)
+
+true_pred_df = cbind(test[c(1)], scale(test[c(102)]), test_predictions_lasso)
+colnames(true_pred_df)[2] = "True"
+colnames(true_pred_df)[3] = "Prediction"
+
+true_pred_df %>% 
+  gather(key, value, -Sample) %>% 
+  ggplot(aes(Sample, value)) + geom_point(aes(color = key)) +
+  ylab("True ~ Prediction") +
+  xlab("Sample ID") + 
+  scale_colour_manual(name="Legend", values=c("red", "blue"))
+```
+
+The MSE is better compared to the result of the overfitted linear model from exercise 1. Also, the coefficient of determination is near 1 which proves good predicting ability. Though, it can be seen from the plot that there are still outliers especially for bigger *Fat* values. 
+
+## 7.
+ 
+```{r, echo=FALSE, a3=TRUE}
+calc_sigma <- function(model, covariates, response) {
+  betas = as.vector((coef(model))[-1, ])
+  residuals = response - (covariates %*% betas)
+  sigma = sd(residuals)
+  return(sigma)
+}
+sigma = calc_sigma(model_lasso_optimal, covariates, response)
+
+set.seed(12345)
+generated_data = rnorm(length(test_y), test_predictions_lasso, sigma)
+
+determination_coefficient = sum((generated_data-mean(test_y))^2)/sum((generated_data-mean(test_y))^2)
+test_mse_lasso_optimal = mean((generated_data-test_y)^2)
+
+cat("Coefficient of determination: ", determination_coefficient, "\nMSE: ", test_mse_lasso_optimal)
+
+true_pred_df = cbind(test[c(1)], scale(test[c(102)]), generated_data)
+colnames(true_pred_df)[2] = "True"
+colnames(true_pred_df)[3] = "Generated"
+
+true_pred_df %>% 
+  gather(key, value, -Sample) %>% 
+  ggplot(aes(Sample, value)) + geom_point(aes(color = key)) +
+  ylab("True ~ Prediction") +
+  xlab("Sample ID") + 
+  scale_colour_manual(name="Legend", values=c("red", "blue"))
+```
+
+The generated data seems to be fitting our model. The coefficient of determination is at its maximum. Though we observe that the MSE is worse as the one we have seen in exercise 6.
+
+
+\newpage
+# Appendix: Assignment 3
+
+```{r, ref.label=knitr::all_labels(a3==TRUE), echo=T, eval=F}
+```
