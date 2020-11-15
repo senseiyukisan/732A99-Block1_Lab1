@@ -37,7 +37,7 @@ pred.knn_v <- fitted(knn.fit_v)
 pred.knn_t <- fitted(knn.fit_t)
 
 
-## Model is worked and trained by using the training data 
+## Model is worked and trained by using the training data and also there is no miss-classification rate while training
 
 
 
@@ -50,19 +50,14 @@ accuracy=sum(diag(cm))/length(validation$X0.26)
 accuracy
 
 
-#
+#misscalculation
 calc_class_err = function(actual, predicted) {
   mean(actual != predicted)
 }
 calc_class_err(validation$X0.26,pred.knn_v)
 
 
-# probability
-v<-as.data.frame(knn.fit$prob)
 
-dim(v)
-
-v[,9]
 
 #Confusion Matrix
 
@@ -96,6 +91,40 @@ acc(test$X0.26,as.factor(pred.knn_t))
  
 
 
+# probability
+
+
+#knn.fit$prob
+v=data.frame(knn.fit$prob)
+estm_pb <- colnames(v)[apply(v, 1, which.max)]
+v$y<-train$X0.26
+v$fit <- knn.fit$fitted
+v$estm_pb <- estm_pb
+###
+y_8 <- v[v$y == 8,]
+yhat_8 <- y_8[y_8$fit == 8,]
+###
+# Best
+easy <- as.numeric(row.names(yhat_8[order(-yhat_8[,9]),][1:2,]))
+
+# Worse
+tougher <- as.numeric(row.names(yhat_8[order(yhat_8[,9]),][1:3,]))
+
+#best
+heatmap(t(matrix(unlist(train[easy[1],-65]), nrow=8)), Colv = NA, Rowv = NA)
+heatmap(t(matrix(unlist(train[easy[2],-65]), nrow=8)), Colv = NA, Rowv = NA)
+
+#worst
+heatmap(t(matrix(unlist(train[tougher[1],-65]), nrow=8)), Colv = NA, Rowv = NA)
+heatmap(t(matrix(unlist(train[tougher[2],-65]), nrow=8)), Colv = NA, Rowv = NA)
+heatmap(t(matrix(unlist(train[tougher[3],-65]), nrow=8)), Colv = NA, Rowv = NA)
+
+#u=as.vector(train$X0.26)
+#train$X0.26
+#n<-as.data.frame(cbind(v,u))
+#dim(n)
+#train$X0.26
+
 
 
 #Find the optimal K value for KNN model for this dataset.(k=1 to 30)                     
@@ -121,13 +150,23 @@ k.optm
 
 y.optm
 
- ####
-library(ggplot2)
-xValue <- 1:30
-yValue <- y.optm,k.optm,
-data <- data.frame(xValue,yValue)
- ggplot(data, aes(x=xValue, y=yValue)) +
-  geom_line()
+
+my.df  <- data.frame(K_Value = c(1:30), Training= c(k.optm), Validation = c(y.optm))
+
+plot3<-ggplot( ) +
+  geom_line(aes(x=my.df$K_Value,y=my.df$Validation,colour="green")) +
+  geom_line(aes(x=my.df$K_Value,y=my.df$Training,colour="red"))+
+  ylab("Missclassification Rate ") +xlab("K_value")+
+scale_color_manual(name = "Missclassification Rate", labels = c("Validation ", "Training "), 
+                   values =c("green", "red"))
+
+
+print(plot3)
+
+optm_value_k <- which.min(y.optm - k.optm )
+
+cat("calculated optimum value of K is: ", optm_value_k)
+
 
 
 ### Cross Entropy
