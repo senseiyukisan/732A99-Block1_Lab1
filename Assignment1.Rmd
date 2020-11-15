@@ -1,0 +1,229 @@
+---
+title: "Machine Learning Assignment 1"
+author: "Mowniesh Asokan(mowas455)"
+date: "11/13/2020"
+output: 
+  pdf_document: default
+  html_document: default
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(glmnet)
+library(psych)
+library(tidyr)
+library(kknn)
+```
+
+# Assignment 1 HandWritten Digit Recognition
+
+
+## 1.Partitioning the data
+
+```{r}
+#Load Data
+dataset = read.csv("C:/Users/Mounish/Desktop/ML/Lab1/optdigits.csv")
+cat("Dimension of Dataset is",dim(dataset),"\n")
+
+#Split the data into train, validation and test
+
+set.seed(12345)
+sample_train<- sample(seq_len(nrow(dataset)), size = floor(0.50*nrow(dataset)))
+sample_valid<- sample(seq_len(nrow(dataset)), size = floor(0.25*nrow(dataset)))
+sample_test <- sample(seq_len(nrow(dataset)), size = floor(0.25*nrow(dataset)))
+
+train     <- dataset[sample_train, ]
+validation<- dataset[sample_valid, ]
+test      <- dataset[sample_test, ]
+
+```
+
+## 2.Fit the kknn model to the training data
+
+```{r kknn, echo=FALSE}
+
+knn.fit <- kknn(as.factor(X0.26)~., train=train,test=train ,k = 30,
+                  kernel = "rectangular")
+
+knn.fit_v <- kknn(as.factor(X0.26)~., train=validation,test=validation,k = 30,
+                  kernel = "rectangular")
+
+knn.fit_t <- kknn(as.factor(X0.26)~., train=test,test=test,k = 30,
+                kernel = "rectangular")
+
+```
+### Predict the validation and test
+```{r,,echo=FALSE}
+pred.knn <- fitted(knn.fit)
+pred.knn_v <- fitted(knn.fit_v)
+pred.knn_t <- fitted(knn.fit_t)
+
+```
+* Model is worked and trained by using the training data .
+* In this nearest neighbor method estimate is formed over the average of K nearest data points   and also the distance is calculated by using Euclidean distance formula.
+
+
+### 1.Confusion Matrix
+```{r,,echo=FALSE}
+c<-table(train$X0.26,as.factor(pred.knn)) # for train data
+cat("Confusion matrix for the training data.")
+print(c)
+v<-table(test$X0.26,as.factor(pred.knn_t)) # for test data
+cat("Confusion matrix for the test data.")
+print(c)
+```
+* In confusion matrix, rows are taken as actual and the columns are taken as predicted$\bar{Y}$
+
+### 2.Missclassification Rate
+
+```{r,echo=FALSE}
+missclassrate=function(y,y_i)
+  {
+  n=length(y)
+  v<-1-(sum(diag(table(y,y_i)))/n)
+  return(v)
+}
+
+
+missclassrate(train$X0.26,as.factor(pred.knn)) # for training data
+
+
+missclassrate(test$X0.26,as.factor(pred.knn_t)) # for test data
+
+```
+According to value We get through the confusion matrix, the miss classification of actual 3 and 4 are high in rate
+
+## 2.Identify any 2 cases of digit “8” in the training data which were easiest to classify and 3 cases that were hardest to classify
+
+```{r,echo=FALSE}
+v=data.frame(knn.fit$prob)
+
+estm_pb <- colnames(v)[apply(v, 1, which.max)]
+
+v$y<-train$X0.26
+
+v$fit <- knn.fit$fitted
+
+v$estm_pb <- estm_pb
+###
+y_8 <- v[v$y == 8,]
+yhat_8 <- y_8[y_8$fit == 8,]
+###
+# Best
+easy <- as.numeric(row.names(yhat_8[order(-yhat_8[,9]),][1:2,]))
+
+# Worse
+tougher <- as.numeric(row.names(yhat_8[order(yhat_8[,9]),][1:3,]))
+
+col=heat.colors(12)
+
+heatmap(t(matrix(unlist(train[easy[1],-65]), nrow=8)),Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+heatmap(t(matrix(unlist(train[easy[2],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
+#worst
+heatmap(t(matrix(unlist(train[tougher[1],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+heatmap(t(matrix(unlist(train[tougher[2],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+heatmap(t(matrix(unlist(train[tougher[3],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
+```
+## 3.Find the optimal K value for KNN model for this dataset.(k=1 to 30) 
+
+```{r,echo=FALSE}
+k=1
+k.optm=c() 
+y.optm=c()
+for (i in 1:30){ 
+  knn.fit <-kknn(as.factor(X0.26)~., train=train,test=train, k = i,kernel = "rectangular")
+  
+  knn.fit_v <-kknn(as.factor(X0.26)~., train=validation,test=validation, k = i,kernel = "rectangular")
+  
+  ypred = fitted(knn.fit)
+  
+  vpred = fitted(knn.fit_v)
+  
+  k.optm[i] = 1-(sum(diag(as.matrix(table(Actual = train$X0.26, Predicted = ypred))))/nrow(train))
+  
+  y.optm[i] = 1-(sum(diag(as.matrix(table(Actual = validation$X0.26, Predicted = vpred))))/nrow(validation))
+  
+}
+k.optm
+
+y.optm
+
+
+my.df  <- data.frame(K_Value = c(1:30), Training= c(k.optm), Validation = c(y.optm))
+
+plot3<-ggplot( ) +
+  geom_line(aes(x=my.df$K_Value,y=my.df$Validation,colour="green")) +
+  geom_line(aes(x=my.df$K_Value,y=my.df$Training,colour="red"))+
+  ylab("Missclassification Rate ") +xlab("K_value")+
+scale_color_manual(name = "Missclassification Rate", labels = c("Validation ", "Training "), 
+                   values =c("green", "red"))
+
+
+print(plot3)
+
+optm_value_k <- which.min(y.optm - k.optm )
+
+cat("calculated optimum value of K is: ", optm_value_k)
+
+```
+## 5.Empirical risk for the validation data as cross-entropy
+
+```{r,echo=FALSE}
+to_binary <- function(i){
+  b <- rep(0,10)
+  b[i+1] <- 1
+  return(I(b))
+}
+ er<-c()
+ for (i in 1:30){ 
+   knn.fit <-kknn(as.factor(X0.26)~., train=train,test=validation, k = i,kernel = "rectangular")
+   
+   probs<- data.frame(knn.fit$prob)
+   max_prob <- colnames(probs)[apply(probs ,1,which.max)]
+   probs$target <- validation$X0.26
+   probs$fit <- knn.fit$fitted
+   probs$max_prob <- max_prob
+   probs$binary <- (lapply(as.numeric(probs$target)-1, to_binary))
+   
+   #cross entropy loss
+   for (j in 1:nrow(probs)){
+     probs[j, "cross_entropy"] <- -sum(log(probs[j,1:10]+1e-15)* probs[[j, "binary"]])
+   }
+   
+   er[i] <- mean(probs$cross_entropy)
+ }
+ 
+ er
+ 
+ df<-data.frame(cross_entropy=er,k_Value=c(1:30))
+   
+ plot4<-ggplot(df,aes(x=k_Value,y=cross_entropy,col="red" ))  +
+        geom_line()+ggtitle("Empirical Risk Of calculating K_value") 
+ print(plot4)
+ 
+best_optm_k_value <-min(er)
+ 
+ cat("calculated optimum value of K by using the cross entropy function is: ", best_optm_k_value)
+ 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Appendix: All code for this report
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
