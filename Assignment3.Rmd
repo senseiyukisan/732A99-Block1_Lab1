@@ -58,6 +58,7 @@ Our loss-function (MSE) is showing big differences between the prediction of tra
 ## 2.
 
 $$\underset{\beta}{\operatorname{argmin}}\left[\sum_{i = 1}^{n}\left(Y_i-\beta_0-\sum_{j = 1}^{p}\beta_jX_{ji}\right)^2+\lambda\sum_{j = 1}^{p}|\beta_j|\right]$$
+
 ## 3.
 
 ```{r, echo=FALSE, a3=TRUE}
