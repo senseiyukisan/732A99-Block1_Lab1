@@ -74,7 +74,7 @@ v<-table(test$X0.26,as.factor(pred.knn_t)) # for test data
 cat("Confusion matrix for the test data.")
 print(c)
 ```
-* In confusion matrix, rows are taken as actual and the columns are taken as predicted$\bar{Y}$
+* In confusion matrix, rows are taken as actual Y and the columns are taken as predicted $\bar{Y}$
 
 ### 2.Missclassification Rate
 
@@ -93,7 +93,7 @@ missclassrate(train$X0.26,as.factor(pred.knn)) # for training data
 missclassrate(test$X0.26,as.factor(pred.knn_t)) # for test data
 
 ```
-According to value We get through the confusion matrix, the miss classification of actual 3 and 4 are high in rate
+According to value We get through the confusion matrix, the miss classification of actual 3 and 4 are high in rate and somewhat 9 is predicted  wrongly as 5 and that the miss classification rate is affected by test and validation data.
 
 ## 2.Identify any 2 cases of digit “8” in the training data which were easiest to classify and 3 cases that were hardest to classify
 
@@ -111,23 +111,28 @@ v$estm_pb <- estm_pb
 y_8 <- v[v$y == 8,]
 yhat_8 <- y_8[y_8$fit == 8,]
 ###
-# Best
+# Easy
 easy <- as.numeric(row.names(yhat_8[order(-yhat_8[,9]),][1:2,]))
 
-# Worse
+# Tough
 tougher <- as.numeric(row.names(yhat_8[order(yhat_8[,9]),][1:3,]))
 
 col=heat.colors(12)
 
 heatmap(t(matrix(unlist(train[easy[1],-65]), nrow=8)),Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
 heatmap(t(matrix(unlist(train[easy[2],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
 
-#worst
+
 heatmap(t(matrix(unlist(train[tougher[1],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
 heatmap(t(matrix(unlist(train[tougher[2],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
 heatmap(t(matrix(unlist(train[tougher[3],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
 
 ```
+The easiest way to classify the 8 is 3 and the toughest way to classify the 8 is 9 and 4.
+
 ## 3.Find the optimal K value for KNN model for this dataset.(k=1 to 30) 
 
 ```{r,echo=FALSE}
@@ -170,31 +175,34 @@ optm_value_k <- which.min(y.optm - k.optm )
 cat("calculated optimum value of K is: ", optm_value_k)
 
 ```
+Based on the varying K value to the model the optimal k value for this dataset is 1. In this hand written digit recognition dataset bias between the data is low and the variance among the data points is high.Miss classification rate for validation and training set is not equal for all the value of k(1 to 30). But the Error rate is equal in the k= 1 and 2.
+
+
 ## 5.Empirical risk for the validation data as cross-entropy
 
 ```{r,echo=FALSE}
-to_binary <- function(i){
-  b <- rep(0,10)
-  b[i+1] <- 1
-  return(I(b))
+rp <- function(i){
+  n <- rep(0,10)
+  n[i+1] <- 1
+  return(I(n))
 }
  er<-c()
  for (i in 1:30){ 
    knn.fit <-kknn(as.factor(X0.26)~., train=train,test=validation, k = i,kernel = "rectangular")
    
-   probs<- data.frame(knn.fit$prob)
-   max_prob <- colnames(probs)[apply(probs ,1,which.max)]
-   probs$target <- validation$X0.26
-   probs$fit <- knn.fit$fitted
-   probs$max_prob <- max_prob
-   probs$binary <- (lapply(as.numeric(probs$target)-1, to_binary))
+   x<- data.frame(knn.fit$prob)
+   max_prob <- colnames(x)[apply(x ,1,which.max)]
+   x$target <- validation$X0.26
+   x$fit <- knn.fit$fitted
+   x$max_prob <- max_prob
+   x$binary <- (lapply(as.numeric(x$target)-1, rp))
    
    #cross entropy loss
-   for (j in 1:nrow(probs)){
-     probs[j, "cross_entropy"] <- -sum(log(probs[j,1:10]+1e-15)* probs[[j, "binary"]])
+   for (j in 1:nrow(x)){
+     x[j, "cross_entropy"] <- -sum(log(x[j,1:10]+1e-15)* x[[j, "binary"]])
    }
    
-   er[i] <- mean(probs$cross_entropy)
+   er[i] <- mean(x$cross_entropy)
  }
  
  er
@@ -210,7 +218,7 @@ best_optm_k_value <-min(er)
  cat("calculated optimum value of K by using the cross entropy function is: ", best_optm_k_value)
  
 ```
-
+In this case the entropy function , Empirical risk of the entropy value get slightly decreased when the value of k increased.So the log loss of this function is decreased depend only on the k value.
 
 
 
