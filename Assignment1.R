@@ -96,28 +96,43 @@ acc(test$X0.26,as.factor(pred.knn_t))
 
 #knn.fit$prob
 v=data.frame(knn.fit$prob)
+head(v)
+
 estm_pb <- colnames(v)[apply(v, 1, which.max)]
+
 v$y<-train$X0.26
+head(v)
 v$fit <- knn.fit$fitted
+
 v$estm_pb <- estm_pb
+
 ###
 y_8 <- v[v$y == 8,]
+
 yhat_8 <- y_8[y_8$fit == 8,]
+
 ###
 # Best
 easy <- as.numeric(row.names(yhat_8[order(-yhat_8[,9]),][1:2,]))
+easy
 
 # Worse
 tougher <- as.numeric(row.names(yhat_8[order(yhat_8[,9]),][1:3,]))
+tougher
+  #best
+col=heat.colors(12)
 
-#best
-heatmap(t(matrix(unlist(train[easy[1],-65]), nrow=8)), Colv = NA, Rowv = NA)
-heatmap(t(matrix(unlist(train[easy[2],-65]), nrow=8)), Colv = NA, Rowv = NA)
+heatmap(t(matrix(unlist(train[easy[1],-65]), nrow=8)),Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
+heatmap(t(matrix(unlist(train[easy[2],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
 
 #worst
-heatmap(t(matrix(unlist(train[tougher[1],-65]), nrow=8)), Colv = NA, Rowv = NA)
-heatmap(t(matrix(unlist(train[tougher[2],-65]), nrow=8)), Colv = NA, Rowv = NA)
-heatmap(t(matrix(unlist(train[tougher[3],-65]), nrow=8)), Colv = NA, Rowv = NA)
+
+heatmap(t(matrix(unlist(train[tougher[1],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
+heatmap(t(matrix(unlist(train[tougher[2],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
+
+heatmap(t(matrix(unlist(train[tougher[3],-65]), nrow=8)), Colv = NA, Rowv = NA,col=rev(heat.colors(12)))
 
 #u=as.vector(train$X0.26)
 #train$X0.26
@@ -170,13 +185,38 @@ cat("calculated optimum value of K is: ", optm_value_k)
 
 
 ### Cross Entropy
- 
- cross.entropy <- function(p, phat){
-   x <- 0
-   for (i in 1:length(p)){
-         
-     x <- x + (p[i] * log(phat[i]))
-   }
-   return(-x)
- }
-cross.entropy(as.factor(validation$X0.26),pred.knn_v)
+rp <- function(i){
+  n <- rep(0,10)
+  n[i+1] <- 1
+  return(I(n))
+}
+er<-c()
+for (i in 1:30){ 
+  knn.fit <-kknn(as.factor(X0.26)~., train=train,test=validation, k = i,kernel = "rectangular")
+  
+  x<- data.frame(knn.fit$prob)
+  max_prob <- colnames(x)[apply(x ,1,which.max)]
+  x$target <- validation$X0.26
+  x$fit <- knn.fit$fitted
+  x$max_prob <- max_prob
+  x$binary <- (lapply(as.numeric(x$target)-1, rp))
+  
+  #cross entropy loss
+  for (j in 1:nrow(x)){
+    x[j, "cross_entropy"] <- -sum(log(x[j,1:10]+1e-15)* x[[j, "binary"]])
+  }
+  
+  er[i] <- mean(x$cross_entropy)
+}
+
+er
+
+df<-data.frame(cross_entropy=er,k_Value=c(1:30))
+
+plot4<-ggplot(df,aes(x=k_Value,y=cross_entropy,col="red" ))  +
+  geom_line()+ggtitle("Empirical Risk Of calculating K_value") 
+print(plot4)
+
+best_optm_k_value <-min(er)
+
+cat("calculated optimum value of K by using the cross entropy function is: ", best_optm_k_value)
