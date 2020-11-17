@@ -94,7 +94,7 @@ for (i in 1:length(lambdas)) {
 ggplot(data=NULL, aes(lambdas, dof)) + geom_point(color="red")
 ```
 
-The trend is as expected. If lambda is large, the parametsers are heavily constrained and the degrees of freedom will effectively be lower, tending to 0 as $\lambda$ -> $\infty$. For $\lambda$ -> $0$, we have *p* parameters. As in OLS all coefficients stay the same, no penalization to be found.
+The trend is as expected. If lambda is large, the parameters are heavily constrained and the degrees of freedom will effectively be lower, tending to 0 as $\lambda$ -> $\infty$. For $\lambda$ -> $0$, we have *p* parameters. As in OLS all coefficients stay the same, no penalization to be found.
 
 ## 5.
 
@@ -135,7 +135,7 @@ cvm_lambda_to_compare = lambda_cvm[ind_lambda_to_compare,]
 print(cvm_lambda_to_compare)
 ```
 
-We check *cvm* for $log(\lambda)=-2$ and get a value of 0.7918415. $log(\lambda)=-2$ is significantly worse compared to our optimal $\lambda$ with cv-score of 0.06060929.
+We check *cvm* for $log(\lambda)=-2$ and get a value of 0.8056608. $log(\lambda)=-2$ is significantly worse compared to our optimal $\lambda$ with cv-score of 0.05526477.
 
 ```{r, echo=FALSE, a3=TRUE}
 test_x = scale(test[, 2:101])
@@ -156,12 +156,12 @@ colnames(true_pred_df)[3] = "Prediction"
 true_pred_df %>% 
   gather(key, value, -Sample) %>% 
   ggplot(aes(Sample, value)) + geom_point(aes(color = key)) +
-  ylab("True ~ Prediction") +
+  ylab("Fat") +
   xlab("Sample ID") + 
   scale_colour_manual(name="Legend", values=c("red", "blue"))
 ```
 
-The MSE is better compared to the result of the overfitted linear model from exercise 1. Also, the coefficient of determination is near 1 which proves good predicting ability. Though, it can be seen from the plot that there are still outliers especially for bigger *Fat* values. 
+The MSE is better compared to the result of the overfitted linear model from exercise 1. Also, the coefficient of determination is near 1 which proves good predicting ability. Though, it can be seen from the plot that there are still outliers especially for larger *Fat* values. 
 
 ## 7.
  
@@ -175,25 +175,24 @@ calc_sigma <- function(model, covariates, response) {
 sigma = calc_sigma(model_lasso_optimal, covariates, response)
 
 set.seed(12345)
-generated_data = rnorm(dim(test_x), test_x, sigma)
+generated_data = rnorm(length(test_y), test_predictions_lasso, sigma)
 
-determination_coefficient = sum((generated_data-mean(test_y))^2)/sum((generated_data-mean(test_y))^2)
 test_mse_lasso_optimal = mean((generated_data-test_y)^2)
 
-cat("Coefficient of determination: ", determination_coefficient, "\nMSE: ", test_mse_lasso_optimal)
+cat("\nMSE: ", test_mse_lasso_optimal)
 
-true_pred_df_ = cbind(test[c(1)], scale(test[c(102)]), generated_data)
-colnames(true_pred_df)[2] = "True"
-colnames(true_pred_df)[3] = "Generated"
+origin_generated_df = cbind(test[c(1)], scale(test[c(102)]), generated_data)
+colnames(origin_generated_df)[2] = "Original"
+colnames(origin_generated_df)[3] = "Generated"
 
-true_pred_df %>% 
+origin_generated_df %>% 
   gather(key, value, -Sample) %>% 
   ggplot(aes(Sample, value)) + geom_point(aes(color = key)) +
-  ylab("True ~ Prediction") +
+  ylab("Fat") +
   xlab("Sample ID") + 
   scale_colour_manual(name="Legend", values=c("red", "blue"))
 ```
-
+By looking at the plot we can see that the newly generated points are more or less in the same region as their original counterparts. Though, we can also observe bigger differences for some of the samples. The MSE between the original and generated target values is also bigger than what we saw for the test data in exercise 6. 
 
 
 \newpage
