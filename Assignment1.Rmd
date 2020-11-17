@@ -191,15 +191,22 @@ rp <- function(i){
    knn.fit <-kknn(as.factor(X0.26)~., train=train,test=validation, k = i,kernel = "rectangular")
    
    x<- data.frame(knn.fit$prob)
+   
    max_prob <- colnames(x)[apply(x ,1,which.max)]
+   
    x$target <- validation$X0.26
+   
    x$fit <- knn.fit$fitted
+   
    x$max_prob <- max_prob
+   
    x$binary <- (lapply(as.numeric(x$target)-1, rp))
    
-   #cross entropy loss
-   for (j in 1:nrow(x)){
-     x[j, "cross_entropy"] <- -sum(log(x[j,1:10]+1e-15)* x[[j, "binary"]])
+   #cross entropy by using log 
+   
+   for (val in 1:nrow(x)){
+     
+     x[val, "cross_entropy"] <- -sum(log(x[val,1:10]+1e-15)* x[[val, "binary"]])
    }
    
    er[i] <- mean(x$cross_entropy)
