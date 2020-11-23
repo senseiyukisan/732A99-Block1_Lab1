@@ -1,5 +1,5 @@
-setwd("C:/Users/Mounish/Desktop/ML/lab1")
-dataset = read.csv("C:/Users/Mounish/Desktop/ML/Lab1/optdigits.csv")
+setwd("C:/Users/Mounish/Desktop/ML/Lab1 Block 1")
+dataset = read.csv("C:/Users/Mounish/Desktop/ML/Lab1 Block 1/optdigits.csv")
 dim(dataset)
 
 
